@@ -86,20 +86,3 @@ func (c Claims) GetExpiresAt() (int64, error) {
 
 	return int64(expiry), nil
 }
-
-func (c Claims) Validate() error {
-	now := time.Now().Unix()
-
-	if exp, _ := c.GetExpiresAt(); exp == 0 {
-		return nil
-	}
-
-	if c.Has(Expiry) {
-		exp, _ := c.GetExpiresAt()
-		if now >= exp {
-			return ErrTokenHasExpired
-		}
-	}
-
-	return nil
-}

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Generate token using claims
@@ -75,6 +76,26 @@ func Parse(token string) (Claims, error) {
 		return nil, err
 	}
 	return claims, nil
+}
+
+func Validate(token string) error {
+	now := time.Now().Unix()
+	claims, err := Parse(token)
+	if err != nil {
+		return err
+	}
+	if exp, _ := claims.GetExpiresAt(); exp == 0 {
+		return nil
+	}
+
+	if claims.Has(Expiry) {
+		exp, _ := claims.GetExpiresAt()
+		if now >= exp {
+			return ErrTokenHasExpired
+		}
+	}
+
+	return nil
 }
 
 // Verify token
