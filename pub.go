@@ -11,20 +11,18 @@ import (
 	"strings"
 )
 
-func (c Claims) Set(name string, value interface{}) { c[name] = value }
-func (c Claims) Del(name string)                    { delete(c, name) }
-func (c Claims) Has(name string) bool               { _, ok := c[name]; return ok }
-func (c Claims) Get(name string) (interface{}, error) {
-	if !c.Has(name) {
-		return nil, ErrNotFound
+// Generate token using claims
+func (c *Claims) Sign(secret []byte) (string, error) {
+	header, err := json.Marshal(map[string]string{"typ": "JWT", "alg": "HS256"})
+	if err != nil {
+		return "", err
 	}
-	return c[name], nil
-}
 
-// Generate token
-func (c *Claims) Generate(secret []byte) string {
-	header, _ := json.Marshal(map[string]string{"typ": "JWT", "alg": "HS256"})
-	claims, _ := json.Marshal(c)
+	claims, err := json.Marshal(c)
+	if err != nil {
+		return "", err
+	}
+
 	token := fmt.Sprintf(
 		"%s.%s",
 		base64.RawURLEncoding.EncodeToString(header),
@@ -33,7 +31,30 @@ func (c *Claims) Generate(secret []byte) string {
 
 	mac := hmac.New(sha256.New, secret)
 	mac.Write([]byte(token))
-	return fmt.Sprintf("%s.%s", token, base64.RawStdEncoding.EncodeToString(mac.Sum(nil)))
+	return fmt.Sprintf("%s.%s", token, base64.RawStdEncoding.EncodeToString(mac.Sum(nil))), nil
+}
+
+// Generate token
+func Sign(secret []byte, payload interface{}) (string, error) {
+	header, err := json.Marshal(map[string]string{"typ": "JWT", "alg": "HS256"})
+	if err != nil {
+		return "", err
+	}
+
+	claims, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+
+	token := fmt.Sprintf(
+		"%s.%s",
+		base64.RawURLEncoding.EncodeToString(header),
+		base64.RawStdEncoding.EncodeToString(claims),
+	)
+
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(token))
+	return fmt.Sprintf("%s.%s", token, base64.RawStdEncoding.EncodeToString(mac.Sum(nil))), nil
 }
 
 // Parsing token
@@ -88,11 +109,13 @@ func (c Claims) ToStruct(payload interface{}) error {
 	return nil
 }
 
-func GenerateUUID() string {
+func GenerateUUID() (string, error) {
 	version := byte(4)
 	uuid := make([]byte, 16)
-	rand.Read(uuid)
-
+	_, err := rand.Read(uuid)
+	if err != nil {
+		return "", err
+	}
 	uuid[6] = (uuid[6] & 0x0f) | (version << 4)
 
 	uuid[8] = (uuid[8] & 0xbf) | 0x80
@@ -109,5 +132,5 @@ func GenerateUUID() string {
 	buf[23] = dash
 	hex.Encode(buf[24:], uuid[10:])
 
-	return string(buf)
+	return string(buf), nil
 }
